@@ -134,11 +134,9 @@ class ScheduleParser
     detect_format(@map)
     format_key_columns
         
-    @schedule = parse_data(@map)   
-    
+    @schedule = parse_data(@map)       
     @schedule = combine_days(@schedule)
-    # @schedule = change_times_to_ranges(@schedule)
-    # puts @schedule.to_yaml
+    @schedule = change_times_to_ranges(@schedule)
   end
     
   def find_day_row(table_map = @map)    
@@ -253,49 +251,47 @@ class ScheduleParser
 
   def combine_days(schedule)
     schedule.each do |name, data|
-      days = {}
+      times = [] 
       data.each do |sched|
-        (days[sched[:day]] ||= []) << sched[:times]
+        combined = {}
+        [sched[:times]].flatten.each do |time|
+          combined[:start_time] = "#{sched[:day]} #{time[:start_time]}"
+          combined[:end_time] = "#{sched[:day]} #{time[:end_time]}"
+        end
+        times << combined
       end
-      schedule[name] = days
+      schedule[name] = times
     end
     schedule
   end
 
   def change_times_to_ranges(schedule)
-    # puts schedule.inspect
-    schedule.each do |show_name, data|
-      data.each do |day, raw_times|
-        raw_times = raw_times.sort_by { |t| DateTime.parse(t[:start_time]) }
-        until raw_times.empty? do
-          selected_time_pair = raw_times.first if (!selected_time_pair)
-          
-          # this is a valid range, add it
-          time_range ||= [] << selected_time_pair[:start_time]
-          time_range << selected_time_pair[:end_time]
-          
-          # look for a link between this end time, and another pair's start time
-          match = raw_times.find { |matching_pair| matching_pair[:start_time] == selected_time_pair[:end_time] }
-          if match
-            # add the found start time to the range 
-            time_range << match[:start_time]
-          else
-            # match wasn't found, add the current time range to the final ranges, and look for another range
-            all_ranges_for_day ||= [] << time_range
-            time_range = []    
-          end
-          # delete the pairs that we've already looked at
-          raw_times.delete_if { |matching_pair| matching_pair[:start_time] == selected_time_pair[:start_time] && matching_pair[:end_time] == selected_time_pair[:end_time]}
-          selected_time_pair = match # set time to the match if matched, and to nil if not matched
-        end
+    schedule.each do |show_name, raw_times|
+      raw_times = raw_times.sort_by { |t| DateTime.parse(t[:start_time]) }
+      until raw_times.empty? do
+        selected_time_pair = raw_times.first if (!selected_time_pair)
         
-        simplified_ranges_for_day = []
-        all_ranges_for_day.each do |range|
-          simplified_ranges_for_day  << {:start_time => DateTime.parse(range.first).strftime("at %I:%M%p"), :end_time => DateTime.parse(range.last).strftime("at %I:%M%p")}
-        end
+        # this is a valid range, add it
+        (time_range ||= []) << selected_time_pair[:start_time]
+        time_range << selected_time_pair[:end_time]
         
-        data[day] = simplified_ranges_for_day      
+        # look for a link between this end time, and another pair's start time
+        match = raw_times.find { |matching_pair| matching_pair[:start_time] == selected_time_pair[:end_time] }
+        if !match
+          # match wasn't found, add the current time range to the final ranges, and look for another range
+          (all_ranges_for_day ||= []) << time_range
+          time_range = []    
+        end
+        # delete the pairs that we've already looked at
+        raw_times.delete_if { |matching_pair| matching_pair[:start_time] == selected_time_pair[:start_time] && matching_pair[:end_time] == selected_time_pair[:end_time]}
+        selected_time_pair = match # set time to the match if matched, and to nil if not matched              
       end
+
+      simplified_ranges_for_day = []
+      all_ranges_for_day.each do |range|
+        simplified_ranges_for_day  << {:start_time => DateTime.parse(range.first).strftime("%A %I:%M%p"), :end_time => DateTime.parse(range.last).strftime("%A %I:%M%p")}
+      end
+      schedule[show_name] = simplified_ranges_for_day 
     end
     schedule
   end
@@ -332,11 +328,12 @@ end
 #   puts schedule.process.to_yaml #.inspect
 # end
 # 
-# ScheduleParser.from_url("http://kut.org/about/schedule", "div.rendered_page_item/table") do |schedule|
-#   puts "KUT"
-#   puts schedule.process.to_yaml
-# end
-# 
+ScheduleParser.from_url("http://kut.org/about/schedule", "div.rendered_page_item/table") do |schedule|
+  puts "KUT"
+  results = schedule.process
+  puts results.to_yaml
+end
+
 # ScheduleParser.from_url("http://www.mnsu.edu/kmsufm/schedule/", "div.msu-content-one-col-container/table") do |schedule|
 #   puts "KMSU"
 #   puts schedule.process.to_yaml
@@ -352,13 +349,13 @@ end
 #   puts schedule.parse.to_yaml
 # end
 # 
-TableMap.new({:url => "http://minnesota.publicradio.org/radio/services/the_current/schedule/index.php?day=mon", :selector => "div.document/table", :cell_filter => lambda{ |content| content.inner_text.gsub(/\r?\n?\s+/, " ").strip }}) do |table|
-  # chop off the uneeded fields
-  map = table.minor(1..(table.map.size - 2),0..1)
-  
-  ScheduleParser.from_map(map, {:time_column_index => 0, :day_row => ["", "Monday"]}) do |schedule|
-    puts schedule.process.inspect
-  end
-end
+# TableMap.new({:url => "http://minnesota.publicradio.org/radio/services/the_current/schedule/index.php?day=mon", :selector => "div.document/table", :cell_filter => lambda{ |content| content.inner_text.gsub(/\r?\n?\s+/, " ").strip }}) do |table|
+#   # chop off the uneeded fields
+#   map = table.minor(1..(table.map.size - 2),0..1)
+#   
+#   ScheduleParser.from_map(map, {:time_column_index => 0, :day_row => ["", "Monday"]}) do |schedule|
+#     puts schedule.process.inspect
+#   end
+# end
 # 
 # 
