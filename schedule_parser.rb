@@ -101,10 +101,8 @@ class ScheduleParser
     # :day_row => (optional) specify the row index of the table where the days are located instead of searching for it
     # :time_row => (optional) specify the column index where the times are located instead of searching for it 
     
-    @options = options
     @map = table_map = (options[:map] ? options[:map] : TableMap.new(options).map)
-    
-    puts table_map.inspect
+    @options = options
     
     @data = {}
     @data[:map] = table_map
@@ -352,13 +350,13 @@ end
 #   puts "KRUI"
 #   puts schedule.process.to_yaml #.inspect
 # end
-# # 
-ScheduleParser.from_url("http://kut.org/about/schedule", "div.rendered_page_item/table") do |schedule|
-  puts "KUT"
-  results = schedule.process
-  puts results.to_yaml
-end
-
+# # # 
+# ScheduleParser.from_url("http://kut.org/about/schedule", "div.rendered_page_item/table") do |schedule|
+#   puts "KUT"
+#   results = schedule.process
+#   puts results.to_yaml
+# end
+# 
 ScheduleParser.from_url("http://www.mnsu.edu/kmsufm/schedule/", "div.msu-content-one-col-container/table") do |schedule|
   puts "KMSU"
   puts schedule.process.to_yaml
